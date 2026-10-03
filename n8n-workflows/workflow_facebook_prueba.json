@@ -1,0 +1,60 @@
+{
+  "id": "manantialPublicarFacebook1",
+  "name": "Prueba - Generar y publicar en Facebook",
+  "active": true,
+  "settings": {},
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "probar-facebook",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "1",
+      "name": "Webhook",
+      "webhookId": "a231159b-e9c7-47fb-b81c-7181a2271eb1",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 320]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:5001/generar",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={}",
+        "options": {}
+      },
+      "id": "2",
+      "name": "Llamar al generador de contenido",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [500, 320]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:5001/publicar_facebook",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ caption: $json.generados[0].caption }) }}",
+        "options": {}
+      },
+      "id": "3",
+      "name": "Publicar en Facebook",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [760, 320]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{"node": "Llamar al generador de contenido", "type": "main", "index": 0}]]
+    },
+    "Llamar al generador de contenido": {
+      "main": [[{"node": "Publicar en Facebook", "type": "main", "index": 0}]]
+    }
+  }
+}

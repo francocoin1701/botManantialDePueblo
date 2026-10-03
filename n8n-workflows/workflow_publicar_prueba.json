@@ -1,0 +1,54 @@
+{
+  "id": "manantialPublicarPrueba1",
+  "name": "Prueba - Generar y publicar en Instagram",
+  "active": false,
+  "settings": {},
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "1",
+      "name": "Inicio manual",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [240, 320]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:5001/generar",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={}",
+        "options": {}
+      },
+      "id": "2",
+      "name": "Llamar al generador de contenido",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [500, 320]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:5001/publicar_instagram",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ caption: $json.generados[0].caption }) }}",
+        "options": {}
+      },
+      "id": "3",
+      "name": "Publicar en Instagram",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [760, 320]
+    }
+  ],
+  "connections": {
+    "Inicio manual": {
+      "main": [[{"node": "Llamar al generador de contenido", "type": "main", "index": 0}]]
+    },
+    "Llamar al generador de contenido": {
+      "main": [[{"node": "Publicar en Instagram", "type": "main", "index": 0}]]
+    }
+  }
+}

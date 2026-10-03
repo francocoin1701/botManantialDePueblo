@@ -1,0 +1,59 @@
+{
+  "id": "manantialCalendario1",
+  "name": "Generador de contenido - Calendario",
+  "active": true,
+  "settings": {},
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            { "field": "cronExpression", "expression": "0 19 * * 2,4" }
+          ]
+        }
+      },
+      "id": "1",
+      "name": "Horario (martes y jueves 7pm)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 240]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "probar-generador",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "2",
+      "name": "Prueba manual (webhook)",
+      "webhookId": "942b2403-dbc4-4a28-995a-b19296c110fb",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:5001/generar",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={}",
+        "options": {}
+      },
+      "id": "3",
+      "name": "Llamar al generador de contenido",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [500, 320]
+    }
+  ],
+  "connections": {
+    "Horario (martes y jueves 7pm)": {
+      "main": [[{ "node": "Llamar al generador de contenido", "type": "main", "index": 0 }]]
+    },
+    "Prueba manual (webhook)": {
+      "main": [[{ "node": "Llamar al generador de contenido", "type": "main", "index": 0 }]]
+    }
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "id": "manantialGroqTest1",
+  "name": "Prueba Groq - Caption Instagram",
+  "active": true,
+  "settings": {},
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "generar-caption",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "1",
+      "name": "Webhook",
+      "webhookId": "91d0397d-281c-4e92-9255-474de654cb42",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"openai/gpt-oss-120b\",\n  \"messages\": [\n    {\"role\": \"system\", \"content\": \"Eres el redactor de marketing de Manantial de Pueblo, agua embotellada de Guaca, Santander, Colombia. Escribe en espanol neutro colombiano, tono cercano y confiable, sin inventar datos del producto.\"},\n    {\"role\": \"user\", \"content\": \"Escribe un caption corto para Instagram promocionando la botella de 600 ml para el gimnasio, con 3 hashtags relevantes.\"}\n  ]\n}",
+        "options": {}
+      },
+      "id": "2",
+      "name": "Groq - Generar caption",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "groqHeaderAuth1",
+          "name": "Groq Header Auth"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Groq - Generar caption", "type": "main", "index": 0 }]]
+    }
+  }
+}
