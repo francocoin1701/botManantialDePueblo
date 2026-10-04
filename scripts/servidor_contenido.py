@@ -153,10 +153,13 @@ def ciclo_completo():
     if not productos:
         return jsonify({"error": "no hay productos configurados"}), 500
 
-    estado = gen.cargar_json(gen.ESTADO_PATH, {"ultimo_indice": -1})
-    siguiente = (estado["ultimo_indice"] + 1) % len(productos)
-    producto = productos[siguiente]
-    estado["ultimo_indice"] = siguiente
+    import random
+    estado = gen.cargar_json(gen.ESTADO_PATH, {"ultima_foto_id": None})
+    candidatos = [p for p in productos if p["id"] != estado.get("ultima_foto_id")]
+    if not candidatos:
+        candidatos = productos
+    producto = random.choice(candidatos)
+    estado["ultima_foto_id"] = producto["id"]
     gen.guardar_json(gen.ESTADO_PATH, estado)
 
     if not producto.get("imagen_pinata_url"):
