@@ -135,5 +135,70 @@ def publicar_facebook():
     return jsonify({"ok": True, "facebook_id": res["id"], "post_id": res.get("post_id")})
 
 
+@app.route("/ciclo_completo", methods=["POST"])
+def ciclo_completo():
+    groq_key = os.environ.get("GROQ_API_KEY")
+    ig_token = os.environ.get("INSTAGRAM_ACCESS_TOKEN")
+    fb_token = os.environ.get("FACEBOOK_PAGE_ACCESS_TOKEN_LONG")
+    fb_page_id = os.environ.get("FACEBOOK_PAGE_ID")
+
+    faltantes = [n for n, v in [
+        ("GROQ_API_KEY", groq_key), ("INSTAGRAM_ACCESS_TOKEN", ig_token),
+        ("FACEBOOK_PAGE_ACCESS_TOKEN_LONG", fb_token), ("FACEBOOK_PAGE_ID", fb_page_id),
+    ] if not v]
+    if faltantes:
+        return jsonify({"error": "faltan variables de entorno", "faltan": faltantes}), 500
+
+    productos = gen.cargar_json(gen.PRODUCTOS_PATH, [])
+    if not productos:
+        return jsonify({"error": "no hay productos configurados"}), 500
+
+    estado = gen.cargar_json(gen.ESTADO_PATH, {"ultimo_indice": -1})
+    siguiente = (estado["ultimo_indice"] + 1) % len(productos)
+    producto = productos[siguiente]
+    estado["ultimo_indice"] = siguiente
+    gen.guardar_json(gen.ESTADO_PATH, estado)
+
+    if not producto.get("imagen_pinata_url"):
+        return jsonify({"error": f"el producto {producto['id']} no tiene imagen_pinata_url"}), 500
+
+    imagen_url = producto["imagen_pinata_url"]
+    caption = gen.llamar_groq(groq_key, producto)
+
+    crear = _graph_post(
+        f"{IG_GRAPH}/{IG_ACCOUNT_ID}/media",
+        {"image_url": imagen_url, "caption": caption, "access_token": ig_token},
+    )
+    resultado_ig = {"ok": False, "detalle": crear}
+    if "id" in crear:
+        time.sleep(5)
+        pub = _graph_post(
+            f"{IG_GRAPH}/{IG_ACCOUNT_ID}/media_publish",
+            {"creation_id": crear["id"], "access_token": ig_token},
+        )
+        resultado_ig = {"ok": "id" in pub, "detalle": pub}
+
+    resultado_fb = _graph_post(
+        f"{FB_GRAPH}/{fb_page_id}/photos",
+        {"url": imagen_url, "caption": caption, "access_token": fb_token},
+    )
+    resultado_fb = {"ok": "id" in resultado_fb, "detalle": resultado_fb}
+
+    entrada = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "producto_id": producto["id"],
+        "producto_nombre": producto["nombre"],
+        "caption": caption,
+        "imagen_url": imagen_url,
+        "instagram": resultado_ig,
+        "facebook": resultado_fb,
+        "estado": "publicado" if resultado_ig["ok"] and resultado_fb["ok"] else "con_errores",
+    }
+    with open(gen.CALENDARIO_PATH, "a", encoding="utf-8") as f:
+        f.write(json.dumps(entrada, ensure_ascii=False) + "\n")
+
+    return jsonify(entrada)
+
+
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5001)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5001)))

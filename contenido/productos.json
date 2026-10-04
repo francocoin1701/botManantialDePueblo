@@ -1,7 +1,37 @@
 [
-  {"id": "600ml", "nombre": "Botella 600 ml", "uso": "el dia a dia: bolso, oficina o el carro", "imagen": "producto-600-normal.jpg"},
-  {"id": "600ml_azul", "nombre": "Botella 600 ml Azul (edicion especial)", "uso": "quien busca un empaque distinto, mismo tratamiento del agua", "imagen": "producto-600-azul.jpg"},
-  {"id": "1l", "nombre": "Botella 1 Litro", "uso": "el trabajo, el gimnasio o un dia largo fuera de casa", "imagen": "producto-1l.jpg"},
-  {"id": "4l", "nombre": "Botellon 4 Litros con asa", "uso": "la cocina o la mesa familiar, facil de servir", "imagen": "producto-4l.jpg"},
-  {"id": "20l", "nombre": "Garrafon 20 Litros", "uso": "el hogar o el negocio, con dispensador de facil llenado", "imagen": "producto-20l.jpg"}
+  {
+    "id": "600ml",
+    "nombre": "Botella 600 ml",
+    "uso": "el dia a dia: bolso, oficina o el carro",
+    "imagen": "producto-600-normal.jpg",
+    "imagen_pinata_url": "https://gateway.pinata.cloud/ipfs/QmduLP7FtMZWxwxVqAmWaWwyKK9opSWQ24zTfmRa14kKDm"
+  },
+  {
+    "id": "600ml_azul",
+    "nombre": "Botella 600 ml Azul (edicion especial)",
+    "uso": "quien busca un empaque distinto, mismo tratamiento del agua",
+    "imagen": "producto-600-azul.jpg",
+    "imagen_pinata_url": "https://gateway.pinata.cloud/ipfs/QmRaWgvCx22EWSTrXSEuqrqgkENfktqUkf6WYkcLutxgW5"
+  },
+  {
+    "id": "1l",
+    "nombre": "Botella 1 Litro",
+    "uso": "el trabajo, el gimnasio o un dia largo fuera de casa",
+    "imagen": "producto-1l.jpg",
+    "imagen_pinata_url": "https://gateway.pinata.cloud/ipfs/QmboQW924itgR4PZ4YKAKmm12KV81a5neTNUuQyTa15bpz"
+  },
+  {
+    "id": "4l",
+    "nombre": "Botellon 4 Litros con asa",
+    "uso": "la cocina o la mesa familiar, facil de servir",
+    "imagen": "producto-4l.jpg",
+    "imagen_pinata_url": "https://gateway.pinata.cloud/ipfs/QmTtmZ3QBRkneNhBKuqHKwdiUokz2FMFZHRgKsXRH4tHaz"
+  },
+  {
+    "id": "20l",
+    "nombre": "Garrafon 20 Litros",
+    "uso": "el hogar o el negocio, con dispensador de facil llenado",
+    "imagen": "producto-20l.jpg",
+    "imagen_pinata_url": "https://gateway.pinata.cloud/ipfs/QmUjyHSv8C9YkYyQCp3X1crq3wLzoty8KppmMnfcXW6Una"
+  }
 ]
