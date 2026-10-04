@@ -135,8 +135,66 @@ def publicar_facebook():
     return jsonify({"ok": True, "facebook_id": res["id"], "post_id": res.get("post_id")})
 
 
+@app.route("/panel")
+def panel():
+    return """
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Manantial de Pueblo - Panel de publicacion</title>
+<style>
+body{font-family:sans-serif;background:#16332B;color:#EFEADD;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:20px;}
+button{background:#2B6F63;color:white;border:none;padding:18px 36px;font-size:1.1rem;border-radius:6px;cursor:pointer;margin-top:20px;}
+button:disabled{opacity:.5;cursor:wait;}
+pre{background:#0d1f1a;padding:16px;border-radius:6px;max-width:600px;overflow-x:auto;margin-top:20px;white-space:pre-wrap;}
+</style>
+</head>
+<body>
+<h2>Manantial de Pueblo</h2>
+<p>Presiona el boton para generar y publicar un post nuevo en Instagram y Facebook.</p>
+<button id="btn" onclick="publicar()">Publicar ahora</button>
+<pre id="resultado"></pre>
+<script>
+async function publicar(){
+  let clave = localStorage.getItem('clave_panel');
+  if(!clave){
+    clave = prompt('Ingresa la clave del panel:');
+    if(!clave) return;
+    localStorage.setItem('clave_panel', clave);
+  }
+  const btn = document.getElementById('btn');
+  const out = document.getElementById('resultado');
+  btn.disabled = true;
+  out.textContent = 'Publicando, espera unos segundos...';
+  try {
+    const resp = await fetch('/ciclo_completo?clave=' + encodeURIComponent(clave), {method:'POST'});
+    const data = await resp.json();
+    if(resp.status === 403){
+      localStorage.removeItem('clave_panel');
+      out.textContent = 'Clave incorrecta, intenta de nuevo.';
+    } else {
+      out.textContent = JSON.stringify(data, null, 2);
+    }
+  } catch(e) {
+    out.textContent = 'Error: ' + e;
+  }
+  btn.disabled = false;
+}
+</script>
+</body>
+</html>
+"""
+
+
 @app.route("/ciclo_completo", methods=["POST"])
 def ciclo_completo():
+    clave_esperada = os.environ.get("ADMIN_SECRET")
+    if clave_esperada:
+        clave_recibida = request.args.get("clave", "")
+        if clave_recibida != clave_esperada:
+            return jsonify({"error": "clave invalida"}), 403
+
     groq_key = os.environ.get("GROQ_API_KEY")
     ig_token = os.environ.get("INSTAGRAM_ACCESS_TOKEN")
     fb_token = os.environ.get("FACEBOOK_PAGE_ACCESS_TOKEN_LONG")
