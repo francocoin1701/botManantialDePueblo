@@ -303,5 +303,37 @@ def ciclo_completo():
     return jsonify(entrada)
 
 
+@app.route("/")
+def pagina_inicio():
+    return """<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Manantial de Pueblo Bot</title></head>
+<body style="font-family:sans-serif;max-width:700px;margin:40px auto;padding:0 16px">
+<h1>Manantial de Pueblo Bot</h1>
+<p>Herramienta interna de Manantial de Pueblo, empresa de agua potable envasada en Guaca, Santander (Colombia). Genera contenido promocional y lo publica de forma automatica en las redes sociales de la empresa (Facebook, Instagram y YouTube).</p>
+<p>Para YouTube, la aplicacion solicita unicamente el permiso de subir videos al canal propio de la empresa.</p>
+<p><a href="/privacidad">Politica de privacidad</a></p>
+<p>Contacto: manantialdepueblo@gmail.com</p>
+</body></html>"""
+
+
+@app.route("/privacidad")
+def pagina_privacidad():
+    return """<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Politica de privacidad - Manantial de Pueblo Bot</title></head>
+<body style="font-family:sans-serif;max-width:700px;margin:40px auto;padding:0 16px">
+<h1>Politica de privacidad</h1>
+<p>Manantial de Pueblo Bot es una herramienta de uso interno. No es una aplicacion publica ni ofrece servicios a terceros.</p>
+<h2>Datos de Google que se usan</h2>
+<p>Con la autorizacion del propietario de la cuenta, la aplicacion usa el permiso de YouTube para subir videos (youtube.upload) al canal de Manantial de Pueblo. No lee ni recopila datos personales de otros usuarios.</p>
+<h2>Almacenamiento y uso</h2>
+<p>Las credenciales de acceso (tokens) se guardan en el servidor de la aplicacion y se usan solo para publicar contenido en el canal del propietario. No se venden, no se comparten ni se transfieren a terceros.</p>
+<h2>Revocar el acceso o pedir eliminacion de datos</h2>
+<p>El acceso se puede revocar en https://myaccount.google.com/permissions . Para pedir la eliminacion de datos, escribe a manantialdepueblo@gmail.com.</p>
+<p><a href="/">Volver al inicio</a></p>
+</body></html>"""
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5001)))
