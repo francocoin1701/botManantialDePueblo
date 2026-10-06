@@ -18,6 +18,12 @@ import generar_contenido as gen
 
 app = Flask(__name__)
 
+# Quita espacios y saltos de linea sobrantes al inicio/final de las variables de entorno
+for _k, _v in list(os.environ.items()):
+    if _v != _v.strip():
+        os.environ[_k] = _v.strip()
+        print(f"[entorno] variable limpiada: {_k}", flush=True)
+
 IG_ACCOUNT_ID = "29600427372879503"
 IG_GRAPH = "https://graph.instagram.com/v26.0"
 FB_GRAPH = "https://graph.facebook.com/v26.0"
