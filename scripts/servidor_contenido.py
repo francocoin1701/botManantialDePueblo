@@ -187,6 +187,48 @@ async function publicar(){
 """
 
 
+@app.route("/youtube_callback")
+def youtube_callback():
+    codigo = request.args.get("code")
+    if not codigo:
+        return jsonify({"error": "no llego el parametro code"}), 400
+
+    client_id = os.environ.get("ID_CLIENT_API_YOUTUBE")
+    client_secret = os.environ.get("SECRET_CLIENT_API_YOUTUBE")
+    redirect_uri = "https://botmanantialdepueblo.onrender.com/youtube_callback"
+
+    datos = urllib.parse.urlencode({
+        "code": codigo,
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "redirect_uri": redirect_uri,
+        "grant_type": "authorization_code",
+    }).encode()
+
+    req = urllib.request.Request(
+        "https://oauth2.googleapis.com/token",
+        data=datos, method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req) as resp:
+            tokens = json.loads(resp.read().decode())
+    except urllib.error.HTTPError as e:
+        return jsonify({"error": "fallo el intercambio", "detalle": e.read().decode()}), 400
+
+    refresh_token = tokens.get("refresh_token")
+    if not refresh_token:
+        return jsonify({
+            "aviso": "No llego refresh_token. Probablemente ya autorizaste antes. Revoca el acceso en https://myaccount.google.com/permissions y repite el proceso.",
+            "tokens_recibidos": tokens,
+        })
+
+    return f"""
+    <h2>Autorizacion exitosa</h2>
+    <p>Copia este refresh_token y guardalo en Render como YOUTUBE_REFRESH_TOKEN:</p>
+    <pre style="background:#eee;padding:16px;word-break:break-all;">{refresh_token}</pre>
+    """
+
+
 @app.route("/ciclo_completo", methods=["POST"])
 def ciclo_completo():
     clave_esperada = os.environ.get("ADMIN_SECRET")
