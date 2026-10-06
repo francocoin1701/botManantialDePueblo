@@ -335,5 +335,16 @@ def pagina_privacidad():
 </body></html>"""
 
 
+@app.route("/diag_youtube")
+def diag_youtube():
+    cid = os.environ.get("ID_CLIENT_API_YOUTUBE")
+    sec = os.environ.get("SECRET_CLIENT_API_YOUTUBE")
+    return jsonify({
+        "client_id": repr(cid),
+        "secret_largo": len(sec) if sec else None,
+        "secret_ultimos4": repr(sec[-4:]) if sec else None,
+    })
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5001)))
