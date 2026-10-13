@@ -3,3 +3,6 @@ requests
 gunicorn
 google-auth-oauthlib
 google-api-python-client
+edge-tts
+imageio-ffmpeg
+Pillow

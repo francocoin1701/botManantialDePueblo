@@ -160,6 +160,7 @@ pre{background:#0d1f1a;padding:16px;border-radius:6px;max-width:600px;overflow-x
 <h2>Manantial de Pueblo</h2>
 <p>Presiona el boton para generar y publicar un post nuevo en Instagram y Facebook.</p>
 <button id="btn" onclick="publicar()">Publicar ahora</button>
+<button id="btn_shorts" onclick="publicarShorts()">Publicar Shorts (IG + FB + YouTube)</button>
 <pre id="resultado"></pre>
 <script>
 async function publicar(){
@@ -187,10 +188,69 @@ async function publicar(){
   }
   btn.disabled = false;
 }
+
+async function publicarShorts(){
+  let clave = localStorage.getItem('clave_panel');
+  if(!clave){
+    clave = prompt('Ingresa la clave del panel:');
+    if(!clave) return;
+    localStorage.setItem('clave_panel', clave);
+  }
+  const btn = document.getElementById('btn_shorts');
+  const out = document.getElementById('resultado');
+  btn.disabled = true;
+  out.textContent = 'Generando y publicando el short... esto puede tardar varios minutos. No cierres esta pestana.';
+  try {
+    const resp = await fetch('/publicar_shorts?clave=' + encodeURIComponent(clave), {method:'POST'});
+    const data = await resp.json();
+    if(resp.status === 403){
+      localStorage.removeItem('clave_panel');
+      out.textContent = 'Clave incorrecta, intenta de nuevo.';
+    } else {
+      out.textContent = JSON.stringify(data, null, 2);
+    }
+  } catch(e) {
+    out.textContent = 'Error: ' + e;
+  }
+  btn.disabled = false;
+}
+
 </script>
 </body>
 </html>
 """
+
+
+@app.route("/publicar_shorts", methods=["POST"])
+def publicar_shorts():
+    clave_esperada = os.environ.get("ADMIN_SECRET")
+    if clave_esperada:
+        clave_recibida = request.args.get("clave", "")
+        if clave_recibida != clave_esperada:
+            return jsonify({"error": "clave invalida"}), 403
+
+    import importlib.util
+    ruta_sn = os.path.join(os.path.dirname(os.path.abspath(__file__)), "short_nube.py")
+    if not os.path.exists(ruta_sn):
+        return jsonify({"error": "no encuentro short_nube.py", "ruta": ruta_sn}), 500
+
+    try:
+        spec = importlib.util.spec_from_file_location("short_nube", ruta_sn)
+        sn = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(sn)
+    except Exception as e:
+        return jsonify({"error": "no pude cargar short_nube.py", "detalle": str(e)}), 500
+
+    pasos = []
+    def avance(t):
+        pasos.append(t)
+
+    try:
+        info = sn.crear_y_publicar(avance=avance, publicar=True)
+    except Exception as e:
+        return jsonify({"error": "fallo crear_y_publicar", "detalle": str(e), "pasos": pasos}), 500
+
+    return jsonify({"ok": info.get("ok", False), "pasos": pasos, "resultado": info})
 
 
 @app.route("/youtube_callback")
@@ -233,6 +293,99 @@ def youtube_callback():
     <p>Copia este refresh_token y guardalo en Render como YOUTUBE_REFRESH_TOKEN:</p>
     <pre style="background:#eee;padding:16px;word-break:break-all;">{refresh_token}</pre>
     """
+
+
+def _youtube_access_token():
+    datos = urllib.parse.urlencode({
+        "client_id": os.environ["ID_CLIENT_API_YOUTUBE"].strip(),
+        "client_secret": os.environ["SECRET_CLIENT_API_YOUTUBE"].strip(),
+        "refresh_token": os.environ["YOUTUBE_REFRESH_TOKEN"].strip(),
+        "grant_type": "refresh_token",
+    }).encode()
+    req = urllib.request.Request(
+        "https://oauth2.googleapis.com/token", data=datos, method="POST")
+    with urllib.request.urlopen(req, timeout=60) as r:
+        return json.loads(r.read().decode())["access_token"]
+
+
+def _youtube_subir(access_token, video_url, titulo, descripcion, privacidad):
+    import tempfile
+    req_dl = urllib.request.Request(video_url, headers={"User-Agent": "curl/8.5.0"})
+    with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp:
+        ruta = tmp.name
+        with urllib.request.urlopen(req_dl, timeout=120) as r:
+            while True:
+                bloque = r.read(1024 * 1024)
+                if not bloque:
+                    break
+                tmp.write(bloque)
+
+    tam = os.path.getsize(ruta)
+    meta = {
+        "snippet": {"title": titulo, "description": descripcion, "categoryId": "22"},
+        "status": {"privacyStatus": privacidad, "selfDeclaredMadeForKids": False},
+    }
+    inicio = urllib.request.Request(
+        "https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status",
+        data=json.dumps(meta).encode(),
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json; charset=UTF-8",
+            "X-Upload-Content-Length": str(tam),
+            "X-Upload-Content-Type": "video/mp4",
+        },
+        method="POST",
+    )
+    with urllib.request.urlopen(inicio, timeout=60) as r:
+        url_subida = r.headers["Location"]
+
+    with open(ruta, "rb") as f:
+        datos_video = f.read()
+    os.remove(ruta)
+
+    subida = urllib.request.Request(
+        url_subida, data=datos_video,
+        headers={"Content-Type": "video/mp4", "Content-Length": str(tam)},
+        method="PUT",
+    )
+    with urllib.request.urlopen(subida, timeout=600) as r:
+        return json.loads(r.read().decode())
+
+
+@app.route("/publicar_youtube", methods=["POST"])
+def publicar_youtube():
+    clave_esperada = os.environ.get("ADMIN_SECRET")
+    if clave_esperada and request.args.get("clave", "") != clave_esperada:
+        return jsonify({"error": "clave invalida"}), 403
+
+    faltan = [v for v in ("ID_CLIENT_API_YOUTUBE", "SECRET_CLIENT_API_YOUTUBE", "YOUTUBE_REFRESH_TOKEN")
+              if not os.environ.get(v)]
+    if faltan:
+        return jsonify({"error": "faltan variables de entorno", "faltan": faltan}), 500
+
+    videos = gen.cargar_json(os.path.join(gen.BASE_DIR, "contenido", "videos.json"), [])
+    if not videos:
+        return jsonify({"error": "no hay videos en contenido/videos.json"}), 500
+
+    body = request.get_json(silent=True) or {}
+    privacidad = body.get("privacidad", "private")
+    video = videos[0]
+
+    try:
+        token = _youtube_access_token()
+        res = _youtube_subir(
+            token, video["video_pinata_url"], video["titulo"],
+            "Publicado automaticamente por Manantial de Pueblo Bot.", privacidad,
+        )
+    except urllib.error.HTTPError as e:
+        return jsonify({"ok": False, "error": e.read().decode()}), 502
+
+    return jsonify({
+        "ok": "id" in res,
+        "youtube_id": res.get("id"),
+        "privacidad": res.get("status", {}).get("privacyStatus"),
+        "url": f"https://www.youtube.com/watch?v={res.get('id')}" if res.get("id") else None,
+    })
 
 
 @app.route("/ciclo_completo", methods=["POST"])
