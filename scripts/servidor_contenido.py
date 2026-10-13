@@ -144,6 +144,31 @@ def publicar_facebook():
     return jsonify({"ok": True, "facebook_id": res["id"], "post_id": res.get("post_id")})
 
 
+@app.route("/manifest.json")
+def manifest_app():
+    datos = {
+        "name": "App Publicar",
+        "short_name": "Publicar",
+        "description": "Panel de publicacion de Manantial de Pueblo",
+        "start_url": "/panel",
+        "scope": "/",
+        "display": "standalone",
+        "background_color": "#16332B",
+        "theme_color": "#16332B",
+        "icons": [
+            {"src": "/static/icono-192.png", "sizes": "192x192", "type": "image/png"},
+            {"src": "/static/icono-512.png", "sizes": "512x512", "type": "image/png"},
+        ],
+    }
+    return app.response_class(json.dumps(datos), mimetype="application/manifest+json")
+
+
+@app.route("/sw.js")
+def service_worker():
+    codigo = "self.addEventListener('install',function(e){self.skipWaiting();});self.addEventListener('activate',function(e){e.waitUntil(self.clients.claim());});self.addEventListener('fetch',function(e){e.respondWith(fetch(e.request));});"
+    return app.response_class(codigo, mimetype="application/javascript")
+
+
 @app.route("/panel")
 def panel():
     return """
@@ -152,6 +177,11 @@ def panel():
 <head>
 <meta charset="UTF-8">
 <title>Manantial de Pueblo - Panel de publicacion</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#16332B">
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/static/icono-192.png">
+<link rel="apple-touch-icon" href="/static/icono-192.png">
 <style>
 body{font-family:sans-serif;background:#16332B;color:#EFEADD;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:20px;}
 button{background:#2B6F63;color:white;border:none;padding:18px 36px;font-size:1.1rem;border-radius:6px;cursor:pointer;margin-top:20px;}
@@ -166,6 +196,7 @@ pre{background:#0d1f1a;padding:16px;border-radius:6px;max-width:600px;overflow-x
 <button id="btn_shorts" onclick="publicarShorts()">Publicar Shorts (IG + FB + YouTube)</button>
 <pre id="resultado"></pre>
 <script>
+if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js');}
 async function publicar(){
   let clave = localStorage.getItem('clave_panel');
   if(!clave){
