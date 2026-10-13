@@ -6,6 +6,8 @@ Servicio web que expone el generador de contenido para que n8n
 import json
 import os
 import sys
+import hmac
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -15,6 +17,7 @@ from flask import Flask, request, jsonify
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import generar_contenido as gen
+import publicar_desde_pinata as pdp
 
 app = Flask(__name__)
 
@@ -199,15 +202,30 @@ async function publicarShorts(){
   const btn = document.getElementById('btn_shorts');
   const out = document.getElementById('resultado');
   btn.disabled = true;
-  out.textContent = 'Generando y publicando el short... esto puede tardar varios minutos. No cierres esta pestana.';
+  out.textContent = 'Enviando...';
   try {
     const resp = await fetch('/publicar_shorts?clave=' + encodeURIComponent(clave), {method:'POST'});
     const data = await resp.json();
     if(resp.status === 403){
       localStorage.removeItem('clave_panel');
       out.textContent = 'Clave incorrecta, intenta de nuevo.';
-    } else {
+      btn.disabled = false;
+      return;
+    }
+    if(resp.status !== 202){
       out.textContent = JSON.stringify(data, null, 2);
+      btn.disabled = false;
+      return;
+    }
+    while(true){
+      await new Promise(r => setTimeout(r, 5000));
+      const st = await (await fetch('/estado_short?clave=' + encodeURIComponent(clave))).json();
+      if(st.estado === 'publicando'){
+        out.textContent = 'Publicando... ' + (st.paso || '') + ' (no cierres esta pestana)';
+      } else {
+        out.textContent = JSON.stringify(st, null, 2);
+        break;
+      }
     }
   } catch(e) {
     out.textContent = 'Error: ' + e;
@@ -221,36 +239,50 @@ async function publicarShorts(){
 """
 
 
+_short_lock = threading.Lock()
+_short_estado = {"estado": "sin_trabajos"}
+
+
+def _clave_panel_ok():
+    esperada = os.environ.get("ADMIN_SECRET", "")
+    return bool(esperada) and hmac.compare_digest(request.args.get("clave", ""), esperada)
+
+
+def _trabajo_short():
+    def avance(texto):
+        _short_estado["paso"] = texto
+    try:
+        _short_estado["resultado"] = pdp.publicar_siguiente(publicar=True, avance=avance)
+        _short_estado["estado"] = "terminado"
+    except pdp.SinVideo as e:
+        _short_estado.update({"estado": "sin_video", "mensaje": str(e)})
+    except Exception as e:
+        _short_estado.update({"estado": "error", "mensaje": f"{type(e).__name__}: {e}"})
+    finally:
+        _short_estado["fin"] = datetime.now(timezone.utc).isoformat()
+        _short_lock.release()
+
+
 @app.route("/publicar_shorts", methods=["POST"])
 def publicar_shorts():
-    clave_esperada = os.environ.get("ADMIN_SECRET")
-    if clave_esperada:
-        clave_recibida = request.args.get("clave", "")
-        if clave_recibida != clave_esperada:
-            return jsonify({"error": "clave invalida"}), 403
+    if not os.environ.get("ADMIN_SECRET"):
+        return jsonify({"error": "ADMIN_SECRET no esta configurada en Render"}), 500
+    if not _clave_panel_ok():
+        return jsonify({"error": "clave invalida"}), 403
+    if not _short_lock.acquire(blocking=False):
+        return jsonify({"error": "ya hay un video publicandose", "estado": _short_estado}), 409
+    _short_estado.clear()
+    _short_estado.update({"estado": "publicando", "paso": "Empezando",
+                          "inicio": datetime.now(timezone.utc).isoformat()})
+    threading.Thread(target=_trabajo_short, daemon=True).start()
+    return jsonify({"aceptado": True}), 202
 
-    import importlib.util
-    ruta_sn = os.path.join(os.path.dirname(os.path.abspath(__file__)), "short_nube.py")
-    if not os.path.exists(ruta_sn):
-        return jsonify({"error": "no encuentro short_nube.py", "ruta": ruta_sn}), 500
 
-    try:
-        spec = importlib.util.spec_from_file_location("short_nube", ruta_sn)
-        sn = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(sn)
-    except Exception as e:
-        return jsonify({"error": "no pude cargar short_nube.py", "detalle": str(e)}), 500
-
-    pasos = []
-    def avance(t):
-        pasos.append(t)
-
-    try:
-        info = sn.crear_y_publicar(avance=avance, publicar=True)
-    except Exception as e:
-        return jsonify({"error": "fallo crear_y_publicar", "detalle": str(e), "pasos": pasos}), 500
-
-    return jsonify({"ok": info.get("ok", False), "pasos": pasos, "resultado": info})
+@app.route("/estado_short")
+def estado_short():
+    if not _clave_panel_ok():
+        return jsonify({"error": "clave invalida"}), 403
+    return jsonify(_short_estado)
 
 
 @app.route("/youtube_callback")
