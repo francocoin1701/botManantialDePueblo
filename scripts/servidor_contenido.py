@@ -21,6 +21,9 @@ import publicar_desde_pinata as pdp
 
 app = Flask(__name__)
 
+import post_foto
+app.register_blueprint(post_foto.bp)
+
 # Quita espacios y saltos de linea sobrantes al inicio/final de las variables de entorno
 for _k, _v in list(os.environ.items()):
     if _v != _v.strip():
@@ -194,9 +197,94 @@ pre{background:#0d1f1a;padding:16px;border-radius:6px;max-width:600px;overflow-x
 <p>Presiona el boton para generar y publicar un post nuevo en Instagram y Facebook.</p>
 <button id="btn" onclick="publicar()">Publicar ahora</button>
 <button id="btn_shorts" onclick="publicarShorts()">Publicar Shorts (IG + FB + YouTube)</button>
+<hr style="width:100%;max-width:600px;border-color:#2B6F63;margin-top:30px">
+<h3>Post con tu foto</h3>
+<input type="file" id="pf_foto" accept="image/*" style="max-width:100%">
+<input type="text" id="pf_sug" placeholder="Sugerencia (opcional)" maxlength="300" style="margin-top:10px;padding:12px;width:90%;max-width:560px;border-radius:6px;border:none">
+<button id="pf_gen" onclick="pfGenerar()">Generar post</button>
+<div id="pf_vista" style="display:none;max-width:600px;margin-top:20px;text-align:center">
+<img id="pf_img" style="max-width:100%;border-radius:8px">
+<textarea id="pf_txt" rows="6" style="width:100%;margin-top:10px;padding:10px;border-radius:6px;border:none;box-sizing:border-box"></textarea>
+<button id="pf_pub" onclick="pfPublicar()">Publicar (IG + FB)</button>
+<button id="pf_rep" onclick="pfRepetir()" style="background:#555">Repetir texto</button>
+</div>
 <pre id="resultado"></pre>
 <script>
 if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js');}
+var pfUrl = '';
+function pfClave(){
+  var c = localStorage.getItem('clave_panel');
+  if(!c){ c = prompt('Ingresa la clave del panel:'); if(!c) return null; localStorage.setItem('clave_panel', c); }
+  return c;
+}
+function pfReducir(file){
+  return new Promise(function(ok, mal){
+    var img = new Image();
+    img.onload = function(){
+      var r = Math.min(1, 1080 / Math.max(img.width, img.height));
+      var cv = document.createElement('canvas');
+      cv.width = Math.round(img.width * r); cv.height = Math.round(img.height * r);
+      cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+      cv.toBlob(function(b){ b ? ok(b) : mal(new Error('no pude reducir la foto')); }, 'image/jpeg', 0.82);
+    };
+    img.onerror = function(){ mal(new Error('no pude leer la foto')); };
+    img.src = URL.createObjectURL(file);
+  });
+}
+function pfBloquear(v){ ['pf_gen','pf_pub','pf_rep'].forEach(function(i){ document.getElementById(i).disabled = v; }); }
+async function pfGenerar(){
+  var clave = pfClave(); if(!clave) return;
+  var f = document.getElementById('pf_foto').files[0];
+  var out = document.getElementById('resultado');
+  if(!f){ out.textContent = 'Escoge una foto primero.'; return; }
+  pfBloquear(true); out.textContent = 'Subiendo foto y escribiendo el texto...';
+  try {
+    var blob = await pfReducir(f);
+    var fd = new FormData();
+    fd.append('foto', blob, 'foto.jpg');
+    fd.append('sugerencia', document.getElementById('pf_sug').value);
+    var resp = await fetch('/post_foto/generar?clave=' + encodeURIComponent(clave), {method:'POST', body: fd});
+    var d = await resp.json();
+    if(resp.status === 403){ localStorage.removeItem('clave_panel'); out.textContent = 'Clave incorrecta, intenta de nuevo.'; }
+    else if(!resp.ok){ out.textContent = JSON.stringify(d, null, 2); }
+    else {
+      pfUrl = d.foto_url;
+      document.getElementById('pf_img').src = pfUrl;
+      document.getElementById('pf_txt').value = d.caption;
+      document.getElementById('pf_vista').style.display = 'block';
+      out.textContent = 'Revisa el texto. Puedes editarlo, repetirlo o publicar.';
+    }
+  } catch(e){ out.textContent = 'Error: ' + e; }
+  pfBloquear(false);
+}
+async function pfRepetir(){
+  var clave = pfClave(); if(!clave) return;
+  var out = document.getElementById('resultado');
+  pfBloquear(true); out.textContent = 'Escribiendo otro texto...';
+  try {
+    var resp = await fetch('/post_foto/repetir?clave=' + encodeURIComponent(clave), {method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({sugerencia: document.getElementById('pf_sug').value, caption: document.getElementById('pf_txt').value})});
+    var d = await resp.json();
+    if(resp.ok){ document.getElementById('pf_txt').value = d.caption; out.textContent = 'Texto nuevo listo.'; }
+    else { out.textContent = JSON.stringify(d, null, 2); }
+  } catch(e){ out.textContent = 'Error: ' + e; }
+  pfBloquear(false);
+}
+async function pfPublicar(){
+  var clave = pfClave(); if(!clave) return;
+  var out = document.getElementById('resultado');
+  pfBloquear(true); out.textContent = 'Publicando en Instagram y Facebook...';
+  try {
+    var resp = await fetch('/post_foto/publicar?clave=' + encodeURIComponent(clave), {method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({foto_url: pfUrl, caption: document.getElementById('pf_txt').value})});
+    var d = await resp.json();
+    out.textContent = JSON.stringify(d, null, 2);
+  } catch(e){ out.textContent = 'Error: ' + e; }
+  pfBloquear(false);
+}
+
 async function publicar(){
   let clave = localStorage.getItem('clave_panel');
   if(!clave){
