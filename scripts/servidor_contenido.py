@@ -53,6 +53,15 @@ def _graph_post(url, datos):
             return {"error": f"HTTP {e.code} sin cuerpo JSON"}
 
 
+def _graph_post_requests(url, datos):
+    """Igual que el Reel: requests, sin User-Agent falso."""
+    import requests
+    try:
+        return requests.post(url, data=datos, timeout=60).json()
+    except Exception as e:
+        return {"error": f"{type(e).__name__}: {e}"}
+
+
 @app.route("/salud", methods=["GET"])
 def salud():
     return jsonify({"estado": "vivo"})
@@ -548,7 +557,7 @@ def ciclo_completo():
             return jsonify({"error": "clave invalida"}), 403
 
     groq_key = os.environ.get("GROQ_API_KEY")
-    ig_token = os.environ.get("INSTAGRAM_ACCESS_TOKEN")
+    ig_token = (os.environ.get("INSTAGRAM_ACCESS_TOKEN") or "").strip() or None
     fb_token = os.environ.get("FACEBOOK_PAGE_ACCESS_TOKEN_LONG")
     fb_page_id = os.environ.get("FACEBOOK_PAGE_ID")
 
@@ -578,7 +587,7 @@ def ciclo_completo():
     imagen_url = producto["imagen_pinata_url"]
     caption = gen.llamar_groq(groq_key, producto)
 
-    crear = _graph_post(
+    crear = _graph_post_requests(
         f"{IG_GRAPH}/{IG_ACCOUNT_ID}/media",
         {"image_url": imagen_url, "caption": caption, "access_token": ig_token},
     )
@@ -596,7 +605,7 @@ def ciclo_completo():
             if estado_cont in ("FINISHED", "ERROR", "EXPIRED"):
                 break
         if estado_cont == "FINISHED":
-            pub = _graph_post(
+            pub = _graph_post_requests(
                 f"{IG_GRAPH}/{IG_ACCOUNT_ID}/media_publish",
                 {"creation_id": crear["id"], "access_token": ig_token},
             )
