@@ -582,14 +582,28 @@ def ciclo_completo():
         f"{IG_GRAPH}/{IG_ACCOUNT_ID}/media",
         {"image_url": imagen_url, "caption": caption, "access_token": ig_token},
     )
-    resultado_ig = {"ok": False, "detalle": crear}
+    resultado_ig = {"ok": False, "paso": "crear_contenedor", "detalle": crear}
     if "id" in crear:
-        time.sleep(5)
-        pub = _graph_post(
-            f"{IG_GRAPH}/{IG_ACCOUNT_ID}/media_publish",
-            {"creation_id": crear["id"], "access_token": ig_token},
-        )
-        resultado_ig = {"ok": "id" in pub, "detalle": pub}
+        estado_cont = None
+        for _ in range(6):
+            time.sleep(5)
+            try:
+                q = urllib.parse.urlencode({"fields": "status_code", "access_token": ig_token})
+                with urllib.request.urlopen(f"{IG_GRAPH}/{crear['id']}?{q}", timeout=30) as r:
+                    estado_cont = json.loads(r.read().decode("utf-8")).get("status_code")
+            except Exception:
+                estado_cont = None
+            if estado_cont in ("FINISHED", "ERROR", "EXPIRED"):
+                break
+        if estado_cont == "FINISHED":
+            pub = _graph_post(
+                f"{IG_GRAPH}/{IG_ACCOUNT_ID}/media_publish",
+                {"creation_id": crear["id"], "access_token": ig_token},
+            )
+            resultado_ig = {"ok": "id" in pub, "paso": "publicar", "detalle": pub}
+        else:
+            resultado_ig = {"ok": False, "paso": "esperar_contenedor",
+                            "estado_contenedor": estado_cont, "detalle": crear}
 
     resultado_fb = _graph_post(
         f"{FB_GRAPH}/{fb_page_id}/photos",
