@@ -56,10 +56,26 @@ def _por_tipo(filas, tipo):
     return sorted(sel, key=lambda f: f.get("date_pinned") or "", reverse=True)
 
 
+GATEWAYS_LECTURA = [GATEWAY, "https://ipfs.io/ipfs/", "https://dweb.link/ipfs/"]
+
+
 def _leer_ultimo(fila):
-    r = requests.get(GATEWAY + fila["ipfs_pin_hash"], timeout=60)
-    r.raise_for_status()
-    return r.json()["cid"]
+    """Lee ultimo_publicado probando varios gateways y esperando si hay 429."""
+    ultimo_error = None
+    for base in GATEWAYS_LECTURA:
+        for intento in range(3):
+            try:
+                r = requests.get(base + fila["ipfs_pin_hash"], timeout=60)
+                if r.status_code == 429:
+                    ultimo_error = "429 Too Many Requests"
+                    time.sleep(5 * (intento + 1))
+                    continue
+                r.raise_for_status()
+                return r.json()["cid"]
+            except (requests.exceptions.RequestException, ValueError, KeyError) as e:
+                ultimo_error = e
+                break
+    raise RuntimeError(f"No se pudo leer ultimo_publicado: {ultimo_error}")
 
 
 def _guardar_ultimo(cid, anteriores):
